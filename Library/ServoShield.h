@@ -20,7 +20,7 @@
 #ifndef ServoShield_h
 #define ServoShield_h
 
-#define ServoShieldVersion 1.5
+#define ServoShieldVersion 1.7
 
 #define HIGHACCURACY
 #define counter1resetpin 7
@@ -29,14 +29,19 @@
 #define step 26
 
 //Direct IO for faster access
-#if defined(__AVR_ATmega1280__)
+#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
 
 #define counter1cntddr	DDRH
 #define counter1cntport PORTH
-#define counter1cntpin 	PH4
 #define counter2cntddr	DDRH
 #define counter2cntport	PORTH
 #define counter2cntpin 	PH5
+
+#if defined(__AVR_ATmega1280__)
+#define counter1cntpin 	PH4
+#else
+#define counter1cntpin PH3
+#endif
 
 #else
 
@@ -58,6 +63,7 @@ public:
 	int setposition(int servo, int position);
 	int setbounds(int servo, int minposition, int maxposition);
 	int getposition(int servo);	
+	int invertservo(int servo);
 	int start();
 	int stop();
 };

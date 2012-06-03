@@ -1,5 +1,5 @@
 /*
-  ServoShield.h - Decade counter driven Servo library for Arduino using one 8 bit timer and 4 DIO to control up to 16 servos
+  ServoShield.cpp - Decade counter driven Servo library for Arduino using one 8 bit timer and 4 DIO to control up to 16 servos
   Revision 1.1
   Copyright (c) 2009 Adriaan Swanepoel.  All right reserved.
 
@@ -20,7 +20,19 @@
 #include "ServoShield.h"
 #include <avr/interrupt.h>
 #include <avr/io.h>
-#include <WProgram.h> 
+
+#if (ARDUINO >= 100)
+#include <Arduino.h>
+#else
+#include <WProgram.h>
+#endif
+
+#ifndef cbi
+#define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
+#endif
+#ifndef sbi
+#define sbi(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
+#endif
 
 volatile uint16_t counter1servopositions[10];
 volatile uint16_t counter2servopositions[10];
@@ -32,6 +44,7 @@ volatile uint16_t counter1current;
 volatile uint16_t counter2current;
 uint16_t servosmax[16];
 uint16_t servosmin[16];
+int inverted[16];
 
 int outputmap[] = {0, 1, 4, 5, 2, 6, 3, 7, 8, 3, 0, 4, 1, 5, 2, 6};
 
@@ -44,8 +57,8 @@ uint16_t CalcCounterValue(int Time)
 ISR(TIMER1_OVF_vect) 
 {
 	counter1cntport |= _BV(counter1cntpin); 
-	*counter1deadperiod -= *counter1currentservo;
 	TCNT1 = CalcCounterValue(*counter1currentservo++); 
+	*counter1deadperiod -= *counter1currentservo;	
 	counter1cntport &= ~_BV(counter1cntpin);	
 	
 	if (counter1currentservo > &counter1servopositions[9])
@@ -55,12 +68,12 @@ ISR(TIMER1_OVF_vect)
 	}		
 }
 
-#if defined(__AVR_ATmega1280__)
+#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__)
 ISR(TIMER3_OVF_vect) 
 {
 	counter2cntport |= _BV(counter2cntpin); 
-	*counter2deadperiod -= *counter2currentservo;
 	TCNT3 = CalcCounterValue(*counter2currentservo++); 
+	*counter2deadperiod -= *counter2currentservo;	
 	counter2cntport &= ~_BV(counter2cntpin);
 	
 	if (counter2currentservo > &counter2servopositions[9])
@@ -83,14 +96,12 @@ ISR(TIMER2_OVF_vect)
 		counter1current = 0;
 		*counter1deadperiod -= *counter1currentservo;
 		
-		if (counter1currentservo > &counter1servopositions[8])
+		if (counter1currentservo > &counter1servopositions[9])
 		{
 			counter1currentservo = &counter1servopositions[0];
 			*counter1deadperiod = deadperiod;
 		}		
-			else
-			
-				counter1currentservo++;	
+	        else counter1currentservo++;	
 			
 		counter1cntport &= ~_BV(counter1cntpin); 
 	}
@@ -104,14 +115,13 @@ ISR(TIMER2_OVF_vect)
 		counter2current = 0;		
 		*counter2deadperiod -= *counter2currentservo;
 		
-		if (counter2currentservo > &counter2servopositions[8])
+		if (counter2currentservo > &counter2servopositions[9])
 		{
 			counter2currentservo = &counter2servopositions[0];
 			*counter2deadperiod = deadperiod;
 		}		
-			else
-			
-				counter2currentservo++;		
+	       
+                else counter2currentservo++;		
 			
 		counter2cntport &= ~_BV(counter2cntpin);  
 	}	
@@ -121,10 +131,12 @@ ISR(TIMER2_OVF_vect)
 
 void timer_init()
 {
-	#ifdef TCCR2B
-	TCCR2B = (1<<CS20); // prescaler = 1
+        cli(); //disable interrupts
+        
+        #ifdef TCCR2B
+	TCCR2B = (1 << CS20); // prescaler = 1
 	#else
-	TCCR2 = (1<<CS20); // prescaler = 1
+	TCCR2 = (1 << CS20); // prescaler = 1
 	#endif //TCCR2B
 	
 	#ifdef HIGHACCURACY
@@ -138,7 +150,7 @@ void timer_init()
 	TIMSK1 = (1 << TOIE1);
 	TCNT1 = CalcCounterValue(*counter1currentservo++); 
 	
-	#ifdef __AVR_ATmega1280__
+	#if defined(__AVR_ATmega1280__)||defined(__AVR_ATmega2560__)
 	//Need to clear first
 	TIMSK3 = 0;
 	TCCR3A = 0;
@@ -150,12 +162,14 @@ void timer_init()
 	TCNT3 = CalcCounterValue(*counter2currentservo++); 
 	#else
 	TIMSK2 = (1 << TOIE2); 		 // Timer2 Overflow Interrupt Enable
-	TCNT2 = 176;				 // init counter
+	TCNT2 = 176;			 // init counter
 	#endif //__AVR_ATmega1280__
 	#else
 	TIMSK2 = (1 << TOIE2); 	 	// Timer2 Overflow Interrupt Enable
-	TCNT2 = 176;				 // init counter
+	TCNT2 = 176;			// init counter
 	#endif //HIGHACCURACY
+        
+        sei(); //enable interrupts
 }
 
 ServoShield::ServoShield()
@@ -225,6 +239,11 @@ int ServoShield::setbounds(int servo, int minposition, int maxposition)
 	return 1;
 }
 
+int ServoShield::invertservo(int servo)
+{
+
+}
+
 int ServoShield::start()
 {
 	//Reset counters
@@ -255,7 +274,7 @@ int ServoShield::stop()
 	
 	#ifdef HIGHACCURACY
 	TIMSK1 &= ~(1 << TOIE1);
-	#ifdef __AVR_ATmega1280__
+	#if defined(__AVR_ATmega1280__)||defined(__AVR_ATmega2560__)
 	TIMSK3 &= ~(3 << TOIE3);
 	#endif //__AVR_ATmega1280__
 	#endif //HIGHACCURACY

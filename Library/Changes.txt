@@ -1,3 +1,22 @@
-Rev 1.5 2010-15-13
+Rev 1.7 2012-02-01
+------------------
+1. Fixed ATMega2560 counter pin mapping
+2. High Accuracy on by default
+
+Tested on:
+Arduino Mega2560
+Arduino Duemilanove w/ ATMega328
+Arduino UNO SMD
+
+Rev 1.6 2010-12-26
+------------------
+1. Fixed dead period handling 
+2. Added compiler defines for ATMega2560
+
+Special thanks to Kurt Eckhart for debugging, bug fixes and recomendations
+
+Rev 1.5 2010-05-13
 ------------------
 1. Fixed output mappings
+
+Special thanks to Liulei for finding and reporting the bug
